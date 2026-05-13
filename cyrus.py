@@ -9,15 +9,19 @@ Protocol (all writes to DATA_CHAR_UUID, with-response):
 """
 
 import asyncio
-import atexit
 import os
-import readline
 import sys
+from dataclasses import dataclass
 
 from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
+from prompt_toolkit import PromptSession
+from prompt_toolkit.formatted_text import HTML
+from prompt_toolkit.history import FileHistory
+from prompt_toolkit.patch_stdout import patch_stdout
 
 DEFAULT_ADDRESS = "FD:6D:51:B8:5F:7E"
+DEFAULT_ADAPTER = "hci0"
 SERVICE_UUID    = "bc2f4cc6-aaef-4351-9034-d66268e328f0"
 DATA_CHAR_UUID  = "06d1e5e7-79ad-4a71-8faa-373789f7d93c"
 
@@ -45,11 +49,43 @@ _VOL_BREAKPOINTS = [
     700, 716, 733, 750, 766, 783, 800, 850, 900, 950, 1000,
 ]
 
+
 def raw_to_display(raw: int) -> int:
     for step, threshold in enumerate(_VOL_BREAKPOINTS):
         if raw <= threshold:
             return step
     return len(_VOL_BREAKPOINTS) - 1
+
+
+@dataclass
+class _State:
+    connected: bool = False
+    device_name: str = ""
+    volume: str = "--"
+    muted: bool = False
+    input_name: str = "--"
+
+
+_state = _State()
+_session: PromptSession | None = None
+
+
+def _toolbar() -> HTML:
+    s = _state
+    if not s.connected:
+        return HTML(" ○ Not connected")
+    mute = "  <b>MUTED</b>" if s.muted else ""
+    return HTML(
+        f" ● <b>{s.device_name}</b>"
+        f"  │  Vol: <b>{s.volume}/75</b>"
+        f"  │  Input: <b>{s.input_name}</b>"
+        f"{mute}"
+    )
+
+
+def _invalidate() -> None:
+    if _session is not None and _session.app.is_running:
+        _session.app.invalidate()
 
 
 def on_notify(char: BleakGATTCharacteristic, data: bytearray) -> None:
@@ -60,28 +96,27 @@ def on_notify(char: BleakGATTCharacteristic, data: bytearray) -> None:
     payload = raw[3:-1] if raw[-1] == 0x25 else raw[3:]
     if cmd == "V":
         try:
-            vol_raw = int(payload)
-            print(f"  volume: {raw_to_display(vol_raw)}/75  (raw {vol_raw})")
+            vol = raw_to_display(int(payload))
+            _state.volume = str(vol)
+            print(f"  volume: {vol}/75")
+            _invalidate()
         except ValueError:
             pass
     elif cmd == "M":
-        if payload == b"10":
-            print("  mute: off")
-        elif payload == b"11":
-            print("  mute: on")
+        _state.muted = payload == b"11"
+        print("  mute:", "on" if _state.muted else "off")
+        _invalidate()
     elif cmd == "I":
         if len(payload) >= 2:
             name = INPUT_NAMES.get(payload[1], chr(payload[1]))
+            _state.input_name = name
             print(f"  input: {name}")
+            _invalidate()
     elif cmd == "A":
-        if payload == b"10":
-            print("  av-direct: off")
-        elif payload == b"11":
-            print("  av-direct: on")
+        print("  av-direct:", "on" if payload == b"11" else "off")
 
 
 def parse_cmd(line: str) -> bytes | None:
-    """Parse a text command and return the BLE bytes to send, or None on error."""
     parts = line.strip().split()
     if not parts:
         return None
@@ -92,7 +127,7 @@ def parse_cmd(line: str) -> bytes | None:
     if cmd in ("unmute", "um"):
         return b"@+M10%"
     if cmd in ("status", "s"):
-        return b""   # special: send multiple fetches
+        return b""
     if cmd in ("volume", "vol", "v"):
         if len(parts) < 2:
             print("  usage: volume <0-75>")
@@ -103,8 +138,7 @@ def parse_cmd(line: str) -> bytes | None:
             print("  volume must be a number 0-75")
             return None
         level = max(VOL_MIN, min(VOL_MAX, level))
-        dd = f"{level:02d}".encode()
-        return b"@+V2" + dd + b"%"
+        return b"@+V2" + f"{level:02d}".encode() + b"%"
     if cmd in ("input", "i"):
         if len(parts) < 2:
             print("  inputs: " + " ".join(INPUTS))
@@ -122,9 +156,6 @@ def parse_cmd(line: str) -> bytes | None:
         raise SystemExit(0)
     print(f"  unknown command '{cmd}'. type 'help' for list.")
     return None
-
-
-DEFAULT_ADAPTER = "hci0"
 
 
 async def find_device(address: str, adapter: str) -> object:
@@ -148,53 +179,57 @@ async def find_device(address: str, adapter: str) -> object:
 async def repl(address: str, adapter: str) -> None:
     device = await find_device(address, adapter)
 
-    async with BleakClient(device, bluez={"adapter": adapter}) as client:
-        print(f"Connected to {device.name}. Type 'help' for commands, 'quit' to exit.\n")
-        await client.start_notify(DATA_CHAR_UUID, on_notify)
+    with patch_stdout():
+        _state.connected = True
+        _state.device_name = device.name or device.address
+        _invalidate()
 
-        # Print initial status on connect
-        for letter in b"VMIA":
-            await client.write_gatt_char(DATA_CHAR_UUID,
-                                         b"@+F1" + bytes([letter]) + b"%",
-                                         response=True)
-            await asyncio.sleep(0.15)
+        async with BleakClient(device, bluez={"adapter": adapter}) as client:
+            print(f"Connected to {device.name}. Type 'help' for commands, 'quit' to exit.\n")
+            await client.start_notify(DATA_CHAR_UUID, on_notify)
 
-        loop = asyncio.get_event_loop()
+            for letter in b"VMIA":
+                await client.write_gatt_char(DATA_CHAR_UUID,
+                                             b"@+F1" + bytes([letter]) + b"%",
+                                             response=True)
+                await asyncio.sleep(0.15)
 
-        while True:
-            # Read a line without blocking the asyncio event loop
-            try:
-                line = await loop.run_in_executor(None, lambda: input("> "))
-            except (EOFError, KeyboardInterrupt):
-                break
+            while True:
+                try:
+                    line = await _session.prompt_async("> ")
+                except (EOFError, KeyboardInterrupt):
+                    break
 
-            try:
-                cmd_bytes = parse_cmd(line)
-            except SystemExit:
-                break
+                try:
+                    cmd_bytes = parse_cmd(line)
+                except SystemExit:
+                    break
 
-            if cmd_bytes is None:
-                continue
+                if cmd_bytes is None:
+                    continue
 
-            try:
-                if cmd_bytes == b"":
-                    # status: fetch each item
-                    for letter in b"VMIA":
-                        await client.write_gatt_char(DATA_CHAR_UUID,
-                                                     b"@+F1" + bytes([letter]) + b"%",
-                                                     response=True)
-                        await asyncio.sleep(0.15)
-                else:
-                    await client.write_gatt_char(DATA_CHAR_UUID, cmd_bytes, response=True)
-                    await asyncio.sleep(0.3)
-            except Exception as e:
-                print(f"  error: {e}")
-                print("  reconnecting…")
-                break
+                try:
+                    if cmd_bytes == b"":
+                        for letter in b"VMIA":
+                            await client.write_gatt_char(DATA_CHAR_UUID,
+                                                         b"@+F1" + bytes([letter]) + b"%",
+                                                         response=True)
+                            await asyncio.sleep(0.15)
+                    else:
+                        await client.write_gatt_char(DATA_CHAR_UUID, cmd_bytes, response=True)
+                        await asyncio.sleep(0.3)
+                except Exception as e:
+                    print(f"  error: {e}")
+                    print("  reconnecting…")
+                    break
+
+    _state.connected = False
+    _state.volume = "--"
+    _state.muted = False
+    _state.input_name = "--"
 
 
 async def main_loop(address: str, adapter: str) -> None:
-    """Keep reconnecting if the connection drops."""
     while True:
         try:
             await repl(address, adapter)
@@ -205,28 +240,27 @@ async def main_loop(address: str, adapter: str) -> None:
             await asyncio.sleep(3)
 
 
-def _setup_history() -> None:
-    state_home = os.environ.get("XDG_STATE_HOME", os.path.join(os.path.expanduser("~"), ".local", "state"))
+def _history_path() -> str:
+    state_home = os.environ.get("XDG_STATE_HOME",
+                                os.path.join(os.path.expanduser("~"), ".local", "state"))
     history_dir = os.path.join(state_home, "cyrus-remote")
     os.makedirs(history_dir, exist_ok=True)
-    history_file = os.path.join(history_dir, "history")
-    try:
-        readline.read_history_file(history_file)
-    except FileNotFoundError:
-        pass
-    readline.set_history_length(500)
-    atexit.register(readline.write_history_file, history_file)
+    return os.path.join(history_dir, "history")
 
 
 if __name__ == "__main__":
     import argparse
-    _setup_history()
     parser = argparse.ArgumentParser(description="Cyrus ONE BLE remote")
     parser.add_argument("-a", "--address", default=DEFAULT_ADDRESS,
                         help=f"BT address (default: {DEFAULT_ADDRESS})")
     parser.add_argument("--adapter", default=DEFAULT_ADAPTER,
                         help=f"HCI adapter (default: {DEFAULT_ADAPTER})")
     args = parser.parse_args()
+
+    _session = PromptSession(
+        history=FileHistory(_history_path()),
+        bottom_toolbar=_toolbar,
+    )
 
     try:
         asyncio.run(main_loop(args.address, args.adapter))
