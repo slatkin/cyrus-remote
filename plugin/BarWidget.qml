@@ -44,18 +44,21 @@ Rectangle {
         }
     }
 
-    MouseArea {
-        anchors.fill: parent
+    TapHandler {
         enabled: connected
-        onClicked: {
+        onTapped: {
             if (!muteProc.running) {
                 muteProc.command = ["cyrus-cmd", muted ? "unmute" : "mute"]
                 muteProc.running = true
             }
         }
-        onWheel: function(wheel) {
+    }
+
+    WheelHandler {
+        enabled: connected
+        onWheel: event => {
             volProc.running = false
-            volProc.command = ["cyrus-cmd", wheel.angleDelta.y > 0 ? "vol+" : "vol-"]
+            volProc.command = ["cyrus-cmd", event.angleDelta.y > 0 ? "vol+" : "vol-"]
             volProc.running = true
         }
     }
