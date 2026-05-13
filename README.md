@@ -1,73 +1,117 @@
 # cyrus-remote
 
-A Python CLI for controlling the **Cyrus ONE** integrated amplifier over Bluetooth Low Energy, replacing the official Android/iOS app.
+Python tools for controlling the **Cyrus ONE** integrated amplifier over Bluetooth Low Energy, replacing the official Android/iOS app.
+
+## Components
+
+| File | Purpose |
+|------|---------|
+| `cyrus.py` | Interactive REPL with persistent status bar |
+| `cyrus_daemon.py` | Headless BLE daemon that feeds the Noctalia bar widget |
+| `cyrus_cmd.py` | One-shot command sender (used by the widget) |
+| `plugin/` | Noctalia shell plugin (bar widget) |
 
 ## Requirements
 
 - Python 3.10+
-- [`bleak`](https://github.com/hbldh/bleak) BLE library
-- Linux with BlueZ (tested), macOS should also work
+- [`bleak`](https://github.com/hbldh/bleak) — BLE library
+- [`prompt_toolkit`](https://github.com/prompt-toolkit/python-prompt-toolkit) — status bar in REPL
+- Linux with BlueZ; two adapters supported via `--adapter`
 
 ```
-pip install bleak
+pip install bleak prompt_toolkit
 ```
 
-## Usage
+## Install
 
 ```
-python3 cyrus.py
+make install
 ```
 
-The script connects to the amplifier (hardcoded address `FD:6D:51:B8:5F:7E` — change `DEFAULT_ADDRESS` in the script to match your unit), prints the current state, and drops into an interactive prompt:
+Installs `cyrus-remote` (REPL), `cyrus-daemon`, and `cyrus-cmd` to `~/.local/bin`, and copies the Noctalia plugin to `~/.config/noctalia/plugins/cyrus-remote/`.
+
+The `cr` alias is also created for `cyrus-remote`.
+
+After installing, add the plugin to `~/.config/noctalia/plugins.json`:
+
+```json
+{ "id": "cyrus-remote", "enabled": true, "path": "/home/you/.config/noctalia/plugins/cyrus-remote" }
+```
+
+## REPL usage
 
 ```
-Scanning for FD:6D:51:B8:5F:7E…
-Found: ONE-888 (FD:6D:51:B8:5F:7E)
+cyrus-remote          # or: cr
+```
+
+Connects to the amp and drops into an interactive prompt with a live status bar at the bottom:
+
+```
 Connected to ONE-888. Type 'help' for commands, 'quit' to exit.
 
-  volume: 49/75  (raw 254)
-  mute: off
-  input: usb
-  av-direct: off
+  volume: 49/75
+  input: optical
 >
+ vol: 49/75  |  input: optical  |  mute: off
 ```
 
-The connection is held open for the entire session. If the link drops the script reconnects automatically.
+The status bar updates live from BLE notifications. Command history persists across sessions in `$XDG_STATE_HOME/cyrus-remote/history`.
 
-To use a different address without editing the file:
+To specify a different BT address or adapter:
 
 ```
-python3 cyrus.py -a AA:BB:CC:DD:EE:FF
+cyrus-remote -a AA:BB:CC:DD:EE:FF --adapter hci1
 ```
 
-## Commands
+### Commands
 
 | Command | Aliases | Description |
 |---------|---------|-------------|
-| `mute` | `m` | Mute audio output |
-| `unmute` | `um` | Unmute audio output |
-| `volume <0-75>` | `vol`, `v` | Set volume (display steps 0–75) |
-| `input <name>` | `i` | Switch input source (see table below) |
-| `status` | `s` | Print current volume, mute state, input, and AV direct |
+| `mute` | `m` | Mute |
+| `unmute` | `um` | Unmute |
+| `volume <0-75>` | `vol`, `v` | Set volume |
+| `input <name>` | `i` | Switch input source |
+| `status` | `s` | Refresh status bar from device |
 | `help` | `?`, `h` | List commands |
 | `quit` | `q`, `exit` | Disconnect and exit |
 
 ### Input sources
 
-| Name | Source |
-|------|--------|
+| Name | Physical input |
+|------|---------------|
 | `bt` | Bluetooth |
 | `usb` | USB-B |
 | `optical` | Optical / TOSLINK |
 | `spdif` | S/PDIF coax |
 | `phono` | Phono |
+| `aux5` | Aux 5 |
 | `aux6` | Aux 6 |
-| `aux7` | Aux 7 |
 | `av` | AV |
+
+## Noctalia bar widget
+
+Run the daemon in the background — it handles BLE and pushes state to the widget via Quickshell IPC:
+
+```
+cyrus-daemon &
+```
+
+The widget shows `vol / input` in the bar and updates on every BLE notification from the amp. Click to toggle mute; scroll to adjust volume.
+
+The daemon auto-reconnects if the link drops and marks the widget as disconnected in the meantime.
+
+## Multiple Bluetooth adapters
+
+Both tools default to `hci0`. Pass `--adapter hciN` to choose a different adapter:
+
+```
+cyrus-remote --adapter hci1
+cyrus-daemon  --adapter hci1
+```
 
 ## Finding your device address
 
-If you don't know your amplifier's Bluetooth address, run a one-off scan:
+If you don't know your amp's Bluetooth address:
 
 ```python
 python3 - <<'EOF'
@@ -86,50 +130,45 @@ asyncio.run(main())
 EOF
 ```
 
-The amplifier advertises with names like `ONE-888` or `CyrusONE-52888`.
+The amp advertises as `ONE-888` or similar.
 
 ## How it works
 
-The Cyrus ONE uses a **MelodySmart** BLE-to-UART bridge module (Blue Creation / Dialog Semiconductor). All communication goes through a single GATT characteristic that is both writable and notifiable:
+The Cyrus ONE uses a **MelodySmart** BLE-to-UART bridge (Blue Creation / Dialog Semiconductor). All communication goes through a single GATT characteristic that is both writable and notifiable:
 
 | Role | UUID |
 |------|------|
 | Service | `bc2f4cc6-aaef-4351-9034-d66268e328f0` |
-| Data characteristic (write + notify) | `06d1e5e7-79ad-4a71-8faa-373789f7d93c` |
+| Data characteristic | `06d1e5e7-79ad-4a71-8faa-373789f7d93c` |
 
 ### Wire format
-
-Every message is framed as:
 
 ```
 @+  <CMD>  1  <data...>  %
 ```
 
-- `@+` — fixed 2-byte prefix (`0x40 0x2B`)
+- `@+` — fixed prefix (`0x40 0x2B`)
 - `CMD` — ASCII command letter
-- `1` — fixed subcommand byte (`0x31`), present in every command
-- `data` — command-specific payload (ASCII digits or letters)
+- `1` — fixed subcommand byte (`0x31`), required on every write
+- `data` — ASCII payload
 - `%` — end byte (`0x25`)
 
-The device echoes each command back as a notification, and also sends unsolicited state updates when the physical controls are used (e.g. turning the volume knob).
+The device echoes commands back as notifications and sends unsolicited updates when physical controls are used.
 
 ### Command reference
 
-| Action | Bytes sent |
-|--------|-----------|
+| Action | Bytes |
+|--------|-------|
 | Mute on | `@+M11%` |
 | Mute off | `@+M10%` |
-| Set volume (step N) | `@+V2<NN>%` — N zero-padded to 2 digits |
-| Switch input | `@+I1<N>%` — N is `1`–`8` |
-| Fetch volume | `@+F1V%` |
-| Fetch mute | `@+F1M%` |
-| Fetch input | `@+F1I%` |
-| Fetch AV direct | `@+F1A%` |
+| Set volume (step N, zero-padded) | `@+V2<NN>%` |
+| Switch input (1–8) | `@+I1<N>%` |
+| Fetch volume / mute / input | `@+F1V%` / `@+F1M%` / `@+F1I%` |
 
-Volume steps 0–75 are a display scale. The amplifier reports raw values 0–1000; the app's `generateMap()` lookup table maps them to display steps.
+Volume steps 0–75 map to raw values 0–1000 via a non-linear (log-taper) lookup table matching the amp's physical knob feel.
 
 ### Reverse engineering
 
-The protocol was recovered by decompiling `Cyrus ONE Remote_1.4_APKPure.apk` with [androguard](https://github.com/androguard/androguard), tracing `fill-array-data-payload` literals in `MainControlActivity` and `CyrusONEModel`, and decoding the DEX static-values section of the `Const` class for byte constants.
+Protocol recovered by decompiling `Cyrus ONE Remote_1.4_APKPure.apk` with [androguard](https://github.com/androguard/androguard), tracing `fill-array-data-payload` literals in `MainControlActivity` and `CyrusONEModel`, and decoding the DEX static-values section of the `Const` class.
 
-The critical discovery was the fixed `1` byte at position 3 of every command (e.g. `M11%` not `M1%`) — without it the amplifier silently ignores all writes.
+The critical detail: the fixed `1` byte at position 3 of every command — without it the amp silently ignores all writes.
