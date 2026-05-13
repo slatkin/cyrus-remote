@@ -204,6 +204,19 @@ async def connect_and_run(address: str, adapter: str) -> None:
 
         await push_state()
 
+        async def _vol_sync() -> None:
+            while client.is_connected:
+                await asyncio.sleep(10)
+                if client.is_connected:
+                    try:
+                        await client.write_gatt_char(
+                            DATA_CHAR_UUID, b"@+F1V%", response=True
+                        )
+                    except Exception:
+                        pass
+
+        asyncio.ensure_future(_vol_sync())
+
         while client.is_connected:
             await asyncio.sleep(0.5)
 
