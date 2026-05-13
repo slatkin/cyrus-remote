@@ -43,6 +43,7 @@ SOCK_PATH = os.path.join(
     os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"),
     "cyrus-remote.sock",
 )
+TCP_PORT = 9876
 
 
 def raw_to_display(raw: int) -> int:
@@ -182,6 +183,12 @@ async def serve_socket() -> None:
         await server.serve_forever()
 
 
+async def serve_tcp(port: int) -> None:
+    server = await asyncio.start_server(_socket_client, "0.0.0.0", port)
+    async with server:
+        await server.serve_forever()
+
+
 async def connect_and_run(address: str, adapter: str) -> None:
     global _client
     print(f"Scanning for {address} on {adapter}…", file=sys.stderr)
@@ -246,7 +253,7 @@ async def ble_loop(address: str, adapter: str) -> None:
         await asyncio.sleep(3)
 
 
-async def main(address: str, adapter: str) -> None:
+async def main(address: str, adapter: str, tcp_port: int) -> None:
     global _loop
     _loop = asyncio.get_running_loop()
 
@@ -259,6 +266,7 @@ async def main(address: str, adapter: str) -> None:
         await asyncio.gather(
             ble_loop(address, adapter),
             serve_socket(),
+            serve_tcp(tcp_port),
         )
     except asyncio.CancelledError:
         pass
@@ -281,9 +289,11 @@ if __name__ == "__main__":
                         help=f"BT address (default: {DEFAULT_ADDRESS})")
     parser.add_argument("--adapter", default=DEFAULT_ADAPTER,
                         help=f"HCI adapter (default: {DEFAULT_ADAPTER})")
+    parser.add_argument("--port", type=int, default=TCP_PORT,
+                        help=f"TCP port for remote commands (default: {TCP_PORT})")
     args = parser.parse_args()
 
     try:
-        asyncio.run(main(args.address, args.adapter))
+        asyncio.run(main(args.address, args.adapter, args.port))
     except (KeyboardInterrupt, SystemExit):
         pass
