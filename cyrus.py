@@ -190,7 +190,7 @@ async def repl(address: str, adapter: str) -> None:
                 try:
                     cmd_bytes = parse_cmd(line)
                 except SystemExit:
-                    break
+                    raise
 
                 if cmd_bytes is None:
                     continue
