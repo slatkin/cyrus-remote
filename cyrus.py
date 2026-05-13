@@ -121,8 +121,11 @@ def parse_cmd(line: str) -> bytes | None:
     return None
 
 
-async def find_device(address: str) -> object:
-    print(f"Scanning for {address}…", file=sys.stderr)
+DEFAULT_ADAPTER = "hci0"
+
+
+async def find_device(address: str, adapter: str) -> object:
+    print(f"Scanning for {address} on {adapter}…", file=sys.stderr)
     device = await BleakScanner.find_device_by_filter(
         lambda d, adv: (
             d.address.upper() == address.upper()
@@ -131,6 +134,7 @@ async def find_device(address: str) -> object:
             or (d.name or "").upper().startswith("ONE-")
         ),
         timeout=30.0,
+        bluez={"adapter": adapter},
     )
     if device is None:
         sys.exit("Device not found.")
@@ -138,10 +142,10 @@ async def find_device(address: str) -> object:
     return device
 
 
-async def repl(address: str) -> None:
-    device = await find_device(address)
+async def repl(address: str, adapter: str) -> None:
+    device = await find_device(address, adapter)
 
-    async with BleakClient(device) as client:
+    async with BleakClient(device, bluez={"adapter": adapter}) as client:
         print(f"Connected to {device.name}. Type 'help' for commands, 'quit' to exit.\n")
         await client.start_notify(DATA_CHAR_UUID, on_notify)
 
@@ -186,11 +190,11 @@ async def repl(address: str) -> None:
                 break
 
 
-async def main_loop(address: str) -> None:
+async def main_loop(address: str, adapter: str) -> None:
     """Keep reconnecting if the connection drops."""
     while True:
         try:
-            await repl(address)
+            await repl(address, adapter)
         except SystemExit:
             raise
         except Exception as e:
@@ -203,9 +207,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Cyrus ONE BLE remote")
     parser.add_argument("-a", "--address", default=DEFAULT_ADDRESS,
                         help=f"BT address (default: {DEFAULT_ADDRESS})")
+    parser.add_argument("--adapter", default=DEFAULT_ADAPTER,
+                        help=f"HCI adapter (default: {DEFAULT_ADAPTER})")
     args = parser.parse_args()
 
     try:
-        asyncio.run(main_loop(args.address))
+        asyncio.run(main_loop(args.address, args.adapter))
     except (SystemExit, KeyboardInterrupt):
         print("\nBye.")
