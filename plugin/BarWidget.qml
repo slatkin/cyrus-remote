@@ -17,6 +17,7 @@ Rectangle {
     readonly property var amp:        pluginApi?.mainInstance
     readonly property bool connected: amp?.connected  ?? false
     readonly property int  vol:       amp?.vol        ?? 0
+    readonly property int  volPct:    amp?.volPct     ?? 0
     readonly property bool muted:     amp?.muted      ?? false
     readonly property string input:   amp?.inputName  ?? "--"
 
@@ -37,7 +38,7 @@ Rectangle {
 
         NText {
             text: connected
-                ? `${Math.round(vol * 100 / 75)}%  ${input}${muted ? "  muted" : ""}`
+                ? `${volPct}%  ${input}${muted ? "  muted" : ""}`
                 : "cyrus"
             color: connected ? Color.mOnSurface : Color.mOnSurfaceVariant
             pointSize: Style.fontSizeS

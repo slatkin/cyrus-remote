@@ -52,6 +52,14 @@ def raw_to_display(raw: int) -> int:
     return len(_VOL_BREAKPOINTS) - 1
 
 
+def display_to_pct(step: int) -> int:
+    """Map display step 0-75 to human-friendly 0-100% via the hardware taper curve."""
+    if step <= 0:
+        return 0
+    idx = min(step, VOL_MAX)
+    return round(_VOL_BREAKPOINTS[idx] * 100 / _VOL_BREAKPOINTS[VOL_MAX])
+
+
 @dataclass
 class _State:
     connected: bool = False
@@ -69,6 +77,7 @@ async def push_state() -> None:
     payload = json.dumps({
         "connected": _state.connected,
         "vol": _state.volume,
+        "vol_pct": display_to_pct(_state.volume),
         "muted": _state.muted,
         "input": _state.input_name,
     })

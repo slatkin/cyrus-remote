@@ -57,6 +57,13 @@ def raw_to_display(raw: int) -> int:
     return len(_VOL_BREAKPOINTS) - 1
 
 
+def display_to_pct(step: int) -> int:
+    if step <= 0:
+        return 0
+    idx = min(step, VOL_MAX)
+    return round(_VOL_BREAKPOINTS[idx] * 100 / _VOL_BREAKPOINTS[VOL_MAX])
+
+
 @dataclass
 class _State:
     connected: bool = False
@@ -76,8 +83,8 @@ def _toolbar() -> str:
     if not s.connected:
         return " not connected"
     mute = "on" if s.muted else "off"
-    vol_pct = f"{round(int(s.volume) * 100 // 75)}%" if s.volume != "--" else "--"
-    return f" vol: {vol_pct}  |  input: {s.input_name}  |  mute: {mute}"
+    vol_str = f"{display_to_pct(int(s.volume))}%" if s.volume != "--" else "--"
+    return f" vol: {vol_str}  |  input: {s.input_name}  |  mute: {mute}"
 
 
 def _invalidate() -> None:

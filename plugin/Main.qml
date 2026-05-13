@@ -8,6 +8,7 @@ Item {
 
     property bool connected: false
     property int vol: 0
+    property int volPct: 0
     property bool muted: false
     property string inputName: "--"
 
@@ -25,6 +26,7 @@ Item {
                 const s = JSON.parse(data)
                 root.connected  = s.connected ?? false
                 root.vol        = s.vol       ?? 0
+                root.volPct     = s.vol_pct   ?? 0
                 root.muted      = s.muted     ?? false
                 root.inputName  = s.input     ?? "--"
             } catch(e) {}
