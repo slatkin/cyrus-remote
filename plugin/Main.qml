@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 
 Item {
     id: root
@@ -9,6 +10,12 @@ Item {
     property int vol: 0
     property bool muted: false
     property string inputName: "--"
+
+    // Auto-start the daemon when the plugin loads; guard against double-start
+    Process {
+        command: ["sh", "-c", "pgrep -x cyrus-daemon > /dev/null || cyrus-daemon"]
+        running: true
+    }
 
     IpcHandler {
         target: "plugin:cyrus-remote"

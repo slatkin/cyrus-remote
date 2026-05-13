@@ -31,7 +31,7 @@ Rectangle {
         spacing: Style.marginS
 
         NIcon {
-            icon:  connected ? "music_note" : "bluetooth_disabled"
+            icon:  connected ? "music_note" : "bluetooth-off"
             color: connected ? Color.mPrimary : Color.mOnSurfaceVariant
         }
 
