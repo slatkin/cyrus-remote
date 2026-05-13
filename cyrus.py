@@ -9,6 +9,7 @@ Protocol (all writes to DATA_CHAR_UUID, with-response):
 """
 
 import asyncio
+import readline  # noqa: F401 — enables up-arrow history for input()
 import sys
 
 from bleak import BleakClient, BleakScanner
@@ -26,8 +27,8 @@ INPUTS = {
     "optical": b"3",
     "spdif":   b"4",
     "phono":   b"5",
-    "aux6":    b"6",
-    "aux7":    b"7",
+    "aux5":    b"6",
+    "aux6":    b"7",
     "av":      b"8",
 }
 INPUT_NAMES = {v[0]: k for k, v in INPUTS.items()}

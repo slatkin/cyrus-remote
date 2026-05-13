@@ -26,8 +26,8 @@ INPUTS = {
     "optical": b"3",
     "spdif":   b"4",
     "phono":   b"5",
-    "aux6":    b"6",
-    "aux7":    b"7",
+    "aux5":    b"6",
+    "aux6":    b"7",
     "av":      b"8",
 }
 INPUT_NAMES = {v[0]: k for k, v in INPUTS.items()}
