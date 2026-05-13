@@ -1,0 +1,12 @@
+[Unit]
+Description=Cyrus ONE BLE Daemon
+After=bluetooth.target
+Requires=bluetooth.target
+
+[Service]
+ExecStart=/usr/local/bin/cyrus-daemon --no-ipc
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
