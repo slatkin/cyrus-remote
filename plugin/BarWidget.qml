@@ -44,25 +44,26 @@ Rectangle {
         }
     }
 
-    TapHandler {
+    MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
         enabled: connected
-        onTapped: {
+        onClicked: {
             if (!muteProc.running) {
                 muteProc.command = ["cyrus-cmd", muted ? "unmute" : "mute"]
                 muteProc.running = true
             }
         }
-    }
-
-    WheelHandler {
-        enabled: connected
-        onWheel: event => {
-            volProc.running = false
-            volProc.command = ["cyrus-cmd", event.angleDelta.y > 0 ? "vol+" : "vol-"]
-            volProc.running = true
+        onWheel: function(wheel) {
+            if (wheel.angleDelta.y > 0) {
+                if (!volUpProc.running)   volUpProc.running   = true
+            } else {
+                if (!volDownProc.running) volDownProc.running = true
+            }
         }
     }
 
-    Process { id: muteProc; running: false }
-    Process { id: volProc;  running: false }
+    Process { id: muteProc;    running: false }
+    Process { id: volUpProc;   command: ["cyrus-cmd", "vol+"]; running: false }
+    Process { id: volDownProc; command: ["cyrus-cmd", "vol-"]; running: false }
 }

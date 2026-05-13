@@ -124,7 +124,14 @@ async def handle_command(cmd: str) -> None:
     if cmd == "mute":
         data = b"@+M11%"
     elif cmd == "unmute":
-        data = b"@+M10%"
+        try:
+            await client.write_gatt_char(DATA_CHAR_UUID, b"@+M10%", response=True)
+            await asyncio.sleep(0.15)
+            vol_data = b"@+V2" + f"{_state.volume:02d}".encode() + b"%"
+            await client.write_gatt_char(DATA_CHAR_UUID, vol_data, response=True)
+        except Exception as e:
+            print(f"command error: {e}", file=sys.stderr)
+        return
     elif cmd == "vol+":
         data = b"@+V2" + f"{min(VOL_MAX, _state.volume + 1):02d}".encode() + b"%"
     elif cmd == "vol-":
