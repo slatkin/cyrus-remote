@@ -25,7 +25,7 @@ DEFAULT_ADAPTER = "hci0"
 SERVICE_UUID    = "bc2f4cc6-aaef-4351-9034-d66268e328f0"
 DATA_CHAR_UUID  = "06d1e5e7-79ad-4a71-8faa-373789f7d93c"
 
-VOL_MIN, VOL_MAX = 0, 120
+VOL_MIN, VOL_MAX = 0, 90
 
 INPUTS = {
     "bt":      b"1",
@@ -133,12 +133,12 @@ def parse_cmd(line: str) -> bytes | None:
         return b""
     if cmd in ("volume", "vol", "v"):
         if len(parts) < 2:
-            print("  usage: volume <0-120>")
+            print("  usage: volume <0-90>")
             return None
         try:
             level = int(parts[1])
         except ValueError:
-            print("  volume must be a number 0-120")
+            print("  volume must be a number 0-90")
             return None
         level = max(VOL_MIN, min(VOL_MAX, level))
         return b"@+V2" + f"{level:02d}".encode() + b"%"
@@ -152,7 +152,7 @@ def parse_cmd(line: str) -> bytes | None:
             return None
         return b"@+I1" + INPUTS[src] + b"%"
     if cmd in ("help", "?", "h"):
-        print("  commands: mute  unmute  volume <0-120>  input <"
+        print("  commands: mute  unmute  volume <0-90>  input <"
               + "|".join(INPUTS) + ">  status  quit")
         return None
     if cmd in ("quit", "q", "exit"):
