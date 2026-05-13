@@ -236,9 +236,17 @@ async def repl(address: str, adapter: str) -> None:
 
 
 async def main_loop(address: str, adapter: str) -> None:
+    import signal
+    loop = asyncio.get_running_loop()
+    task = asyncio.current_task()
+    for sig in (signal.SIGTERM,):
+        loop.add_signal_handler(sig, lambda: task.cancel())
+
     while True:
         try:
             await repl(address, adapter)
+        except asyncio.CancelledError:
+            raise
         except SystemExit:
             raise
         except Exception as e:

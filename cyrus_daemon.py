@@ -287,28 +287,32 @@ async def main(address: str, adapter: str, tcp_port: int, no_ipc: bool) -> None:
     _loop = asyncio.get_running_loop()
     _no_ipc = no_ipc
 
+    shutdown = asyncio.Event()
     loop = asyncio.get_running_loop()
-    task = asyncio.current_task()
     for sig in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(sig, lambda: task.cancel())
+        loop.add_signal_handler(sig, shutdown.set)
 
-    try:
-        await asyncio.gather(
-            ble_loop(address, adapter),
-            serve_socket(),
-            serve_tcp(tcp_port),
-        )
-    except asyncio.CancelledError:
-        pass
-    finally:
-        if _client and _client.is_connected:
-            try:
-                await _client.disconnect()
-            except Exception:
-                pass
-        if os.path.exists(SOCK_PATH):
-            os.unlink(SOCK_PATH)
-        print("\nDaemon stopped.", file=sys.stderr)
+    tasks = [
+        asyncio.ensure_future(ble_loop(address, adapter)),
+        asyncio.ensure_future(serve_socket()),
+        asyncio.ensure_future(serve_tcp(tcp_port)),
+    ]
+
+    await shutdown.wait()
+
+    if _client and _client.is_connected:
+        try:
+            await asyncio.wait_for(_client.disconnect(), timeout=5.0)
+        except Exception:
+            pass
+
+    for t in tasks:
+        t.cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+
+    if os.path.exists(SOCK_PATH):
+        os.unlink(SOCK_PATH)
+    print("\nDaemon stopped.", file=sys.stderr)
 
 
 if __name__ == "__main__":
