@@ -2,7 +2,7 @@
 
 Python tools for controlling the **Cyrus ONE** integrated amplifier over Bluetooth Low Energy, replacing the official Android/iOS app.
 
-![Red panda](https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Red_Panda_in_a_Gingko_tree.jpg/640px-Red_Panda_in_a_Gingko_tree.jpg)
+![Red panda](https://potterparkzoo.org/wp-content/uploads/2025/08/4204-scaled.jpg)
 
 ## Architecture
 
