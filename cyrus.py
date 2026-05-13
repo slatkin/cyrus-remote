@@ -76,7 +76,8 @@ def _toolbar() -> str:
     if not s.connected:
         return " not connected"
     mute = "on" if s.muted else "off"
-    return f" vol: {s.volume}/75  |  input: {s.input_name}  |  mute: {mute}"
+    vol_pct = f"{round(int(s.volume) * 100 // 75)}%" if s.volume != "--" else "--"
+    return f" vol: {vol_pct}  |  input: {s.input_name}  |  mute: {mute}"
 
 
 def _invalidate() -> None:

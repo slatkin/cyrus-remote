@@ -37,7 +37,7 @@ Rectangle {
 
         NText {
             text: connected
-                ? `${vol}/75  ${input}${muted ? "  muted" : ""}`
+                ? `${Math.round(vol * 100 / 75)}%  ${input}${muted ? "  muted" : ""}`
                 : "cyrus"
             color: connected ? Color.mOnSurface : Color.mOnSurfaceVariant
             pointSize: Style.fontSizeS
