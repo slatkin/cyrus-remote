@@ -97,7 +97,7 @@ async def push_state() -> None:
             await writer.drain()
         except Exception:
             dead.add(writer)
-    _tcp_writers -= dead
+    _tcp_writers.difference_update(dead)
 
 
 def on_notify(char: BleakGATTCharacteristic, data: bytearray) -> None:
