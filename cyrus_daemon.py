@@ -15,7 +15,7 @@ DEFAULT_ADAPTER = "hci0"
 SERVICE_UUID    = "bc2f4cc6-aaef-4351-9034-d66268e328f0"
 DATA_CHAR_UUID  = "06d1e5e7-79ad-4a71-8faa-373789f7d93c"
 
-VOL_MIN, VOL_MAX = 0, 90
+VOL_MIN, VOL_MAX = 0, 100
 
 INPUTS = {
     "bt":      b"1",
@@ -97,7 +97,7 @@ def on_notify(char: BleakGATTCharacteristic, data: bytearray) -> None:
     if cmd == "V":
         try:
             vol = int(payload[1:])  # payload = subtype_byte + step, e.g. b"248" → step 48
-            if 0 <= vol <= 90 and _state.volume != vol:
+            if 0 <= vol <= VOL_MAX and _state.volume != vol:
                 _state.volume = vol
                 changed = True
         except (ValueError, IndexError):
