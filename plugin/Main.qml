@@ -13,7 +13,7 @@ Item {
 
     // Auto-start the daemon when the plugin loads; guard against double-start
     Process {
-        command: ["sh", "-c", "pgrep -x cyrus-daemon > /dev/null || cyrus-daemon"]
+        command: ["sh", "-c", "pgrep -f cyrus-daemon > /dev/null || cyrus-daemon"]
         running: true
     }
 
