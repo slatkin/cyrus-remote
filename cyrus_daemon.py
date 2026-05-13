@@ -15,7 +15,7 @@ DEFAULT_ADAPTER = "hci0"
 SERVICE_UUID    = "bc2f4cc6-aaef-4351-9034-d66268e328f0"
 DATA_CHAR_UUID  = "06d1e5e7-79ad-4a71-8faa-373789f7d93c"
 
-VOL_MIN, VOL_MAX = 0, 100
+VOL_MIN, VOL_MAX = 0, 120
 
 INPUTS = {
     "bt":      b"1",
