@@ -69,6 +69,7 @@ _state = _State()
 _client: BleakClient | None = None
 _loop: asyncio.AbstractEventLoop | None = None
 _tcp_writers: set[asyncio.StreamWriter] = set()
+_no_ipc: bool = False
 
 
 def _state_payload() -> str:
@@ -83,13 +84,14 @@ def _state_payload() -> str:
 
 async def push_state() -> None:
     payload = _state_payload()
-    proc = await asyncio.create_subprocess_exec(
-        "qs", "-c", "noctalia-shell", "ipc", "call",
-        "plugin:cyrus-remote", "updateState", payload,
-        stdout=asyncio.subprocess.DEVNULL,
-        stderr=asyncio.subprocess.DEVNULL,
-    )
-    await proc.wait()
+    if not _no_ipc:
+        proc = await asyncio.create_subprocess_exec(
+            "qs", "-c", "noctalia-shell", "ipc", "call",
+            "plugin:cyrus-remote", "updateState", payload,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        await proc.wait()
     dead = set()
     for writer in list(_tcp_writers):
         try:
@@ -280,9 +282,10 @@ async def ble_loop(address: str, adapter: str) -> None:
         await asyncio.sleep(3)
 
 
-async def main(address: str, adapter: str, tcp_port: int) -> None:
-    global _loop
+async def main(address: str, adapter: str, tcp_port: int, no_ipc: bool) -> None:
+    global _loop, _no_ipc
     _loop = asyncio.get_running_loop()
+    _no_ipc = no_ipc
 
     loop = asyncio.get_running_loop()
     task = asyncio.current_task()
@@ -318,9 +321,11 @@ if __name__ == "__main__":
                         help=f"HCI adapter (default: {DEFAULT_ADAPTER})")
     parser.add_argument("--port", type=int, default=TCP_PORT,
                         help=f"TCP port for remote commands (default: {TCP_PORT})")
+    parser.add_argument("--no-ipc", action="store_true",
+                        help="Skip local Noctalia IPC push (headless/server mode)")
     args = parser.parse_args()
 
     try:
-        asyncio.run(main(args.address, args.adapter, args.port))
+        asyncio.run(main(args.address, args.adapter, args.port, args.no_ipc))
     except (KeyboardInterrupt, SystemExit):
         pass
