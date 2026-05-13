@@ -9,7 +9,9 @@ Protocol (all writes to DATA_CHAR_UUID, with-response):
 """
 
 import asyncio
-import readline  # noqa: F401 — enables up-arrow history for input()
+import atexit
+import os
+import readline
 import sys
 
 from bleak import BleakClient, BleakScanner
@@ -203,8 +205,22 @@ async def main_loop(address: str, adapter: str) -> None:
             await asyncio.sleep(3)
 
 
+def _setup_history() -> None:
+    state_home = os.environ.get("XDG_STATE_HOME", os.path.join(os.path.expanduser("~"), ".local", "state"))
+    history_dir = os.path.join(state_home, "cyrus-remote")
+    os.makedirs(history_dir, exist_ok=True)
+    history_file = os.path.join(history_dir, "history")
+    try:
+        readline.read_history_file(history_file)
+    except FileNotFoundError:
+        pass
+    readline.set_history_length(500)
+    atexit.register(readline.write_history_file, history_file)
+
+
 if __name__ == "__main__":
     import argparse
+    _setup_history()
     parser = argparse.ArgumentParser(description="Cyrus ONE BLE remote")
     parser.add_argument("-a", "--address", default=DEFAULT_ADDRESS,
                         help=f"BT address (default: {DEFAULT_ADDRESS})")
