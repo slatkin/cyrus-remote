@@ -48,10 +48,15 @@ Rectangle {
         anchors.fill: parent
         hoverEnabled: true
         enabled: connected
-        onClicked: {
-            if (!muteProc.running) {
-                muteProc.command = ["cyrus-cmd", muted ? "unmute" : "mute"]
-                muteProc.running = true
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onClicked: function(mouse) {
+            if (mouse.button === Qt.RightButton) {
+                inputMenu.openAtItem(root, screen)
+            } else {
+                if (!muteProc.running) {
+                    muteProc.command = ["cyrus-cmd", muted ? "unmute" : "mute"]
+                    muteProc.running = true
+                }
             }
         }
         onWheel: function(wheel) {
@@ -63,7 +68,29 @@ Rectangle {
         }
     }
 
+    NPopupContextMenu {
+        id: inputMenu
+        model: {
+            const a = root.input
+            return [
+                { label: (a === "bt"      ? "✓ " : "") + "Bluetooth", action: "bt",      icon: "bluetooth"  },
+                { label: (a === "usb"     ? "✓ " : "") + "USB",       action: "usb",     icon: "device-usb" },
+                { label: (a === "optical" ? "✓ " : "") + "Optical",   action: "optical", icon: "music"      },
+                { label: (a === "spdif"   ? "✓ " : "") + "SPDIF",     action: "spdif",   icon: "music"      },
+                { label: (a === "phono"   ? "✓ " : "") + "Phono",     action: "phono",   icon: "vinyl"      },
+                { label: (a === "aux5"    ? "✓ " : "") + "Aux 5",     action: "aux5",    icon: "plug"       },
+                { label: (a === "aux6"    ? "✓ " : "") + "Aux 6",     action: "aux6",    icon: "plug"       },
+            ]
+        }
+        onTriggered: function(action) {
+            inputMenu.close()
+            inputProc.command = ["cyrus-cmd", "input:" + action]
+            if (!inputProc.running) inputProc.running = true
+        }
+    }
+
     Process { id: muteProc;    running: false }
     Process { id: volUpProc;   command: ["cyrus-cmd", "vol+"]; running: false }
     Process { id: volDownProc; command: ["cyrus-cmd", "vol-"]; running: false }
+    Process { id: inputProc;   running: false }
 }
