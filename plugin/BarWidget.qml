@@ -14,7 +14,7 @@ Rectangle {
     property int sectionWidgetIndex: -1
     property int sectionWidgetsCount: 0
 
-    readonly property var amp:       pluginApi?.mainInstance
+    readonly property var amp:        pluginApi?.mainInstance
     readonly property bool connected: amp?.connected  ?? false
     readonly property int  vol:       amp?.vol        ?? 0
     readonly property bool muted:     amp?.muted      ?? false
@@ -31,7 +31,7 @@ Rectangle {
         spacing: Style.marginS
 
         NIcon {
-            icon:  connected ? "music_note" : "bluetooth-off"
+            icon:  connected ? "music" : "bluetooth-off"
             color: connected ? Color.mPrimary : Color.mOnSurfaceVariant
         }
 
@@ -44,26 +44,22 @@ Rectangle {
         }
     }
 
-    // click toggles mute
     MouseArea {
         anchors.fill: parent
         enabled: connected
-        onClicked: sendCmd(muted ? "unmute" : "mute")
+        onClicked: {
+            if (!muteProc.running) {
+                muteProc.command = ["cyrus-cmd", muted ? "unmute" : "mute"]
+                muteProc.running = true
+            }
+        }
+        onWheel: function(wheel) {
+            volProc.running = false
+            volProc.command = ["cyrus-cmd", wheel.angleDelta.y > 0 ? "vol+" : "vol-"]
+            volProc.running = true
+        }
     }
 
-    // scroll wheel adjusts volume
-    WheelHandler {
-        onWheel: event => sendCmd(event.angleDelta.y > 0 ? "vol+" : "vol-")
-    }
-
-    Process {
-        id: cmdProc
-        running: false
-    }
-
-    function sendCmd(cmd) {
-        if (cmdProc.running) return
-        cmdProc.command = ["cyrus-cmd", cmd]
-        cmdProc.running = true
-    }
+    Process { id: muteProc; running: false }
+    Process { id: volProc;  running: false }
 }
