@@ -68,16 +68,21 @@ class _State:
 _state = _State()
 _client: BleakClient | None = None
 _loop: asyncio.AbstractEventLoop | None = None
+_tcp_writers: set[asyncio.StreamWriter] = set()
 
 
-async def push_state() -> None:
-    payload = json.dumps({
+def _state_payload() -> str:
+    return json.dumps({
         "connected": _state.connected,
         "vol": _state.volume,
         "vol_pct": display_to_pct(_state.volume),
         "muted": _state.muted,
         "input": _state.input_name,
     })
+
+
+async def push_state() -> None:
+    payload = _state_payload()
     proc = await asyncio.create_subprocess_exec(
         "qs", "-c", "noctalia-shell", "ipc", "call",
         "plugin:cyrus-remote", "updateState", payload,
@@ -85,6 +90,14 @@ async def push_state() -> None:
         stderr=asyncio.subprocess.DEVNULL,
     )
     await proc.wait()
+    dead = set()
+    for writer in list(_tcp_writers):
+        try:
+            writer.write((payload + "\n").encode())
+            await writer.drain()
+        except Exception:
+            dead.add(writer)
+    _tcp_writers -= dead
 
 
 def on_notify(char: BleakGATTCharacteristic, data: bytearray) -> None:
@@ -183,8 +196,22 @@ async def serve_socket() -> None:
         await server.serve_forever()
 
 
+async def _tcp_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    _tcp_writers.add(writer)
+    try:
+        writer.write((_state_payload() + "\n").encode())
+        await writer.drain()
+        async for line in reader:
+            await handle_command(line.decode())
+    except Exception:
+        pass
+    finally:
+        _tcp_writers.discard(writer)
+        writer.close()
+
+
 async def serve_tcp(port: int) -> None:
-    server = await asyncio.start_server(_socket_client, "0.0.0.0", port)
+    server = await asyncio.start_server(_tcp_client, "0.0.0.0", port)
     async with server:
         await server.serve_forever()
 

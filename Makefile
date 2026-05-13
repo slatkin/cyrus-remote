@@ -8,6 +8,7 @@ install:
 	install -m 755 cyrus.py        $(BINDIR)/cyrus-remote
 	install -m 755 cyrus_daemon.py $(BINDIR)/cyrus-daemon
 	install -m 755 cyrus_cmd.py    $(BINDIR)/cyrus-cmd
+	install -m 755 cyrus_proxy.py  $(BINDIR)/cyrus-proxy
 	ln -sf $(BINDIR)/cyrus-remote $(BINDIR)/cr
 	mkdir -p $(PLUGINDIR)
 	install -m 644 plugin/manifest.json $(PLUGINDIR)/
@@ -20,5 +21,5 @@ install:
 	@echo "Run the daemon: cyrus-daemon &"
 
 uninstall:
-	rm -f $(BINDIR)/cyrus-remote $(BINDIR)/cyrus-daemon $(BINDIR)/cyrus-cmd $(BINDIR)/cr
+	rm -f $(BINDIR)/cyrus-remote $(BINDIR)/cyrus-daemon $(BINDIR)/cyrus-cmd $(BINDIR)/cyrus-proxy $(BINDIR)/cr
 	rm -rf $(PLUGINDIR)

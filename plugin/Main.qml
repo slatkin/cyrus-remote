@@ -12,9 +12,15 @@ Item {
     property bool muted: false
     property string inputName: "--"
 
-    // Auto-start the daemon when the plugin loads; guard against double-start
+    // Auto-start daemon (local) or proxy (remote). Set CYRUS_PROXY_HOST to use proxy mode.
     Process {
-        command: ["sh", "-c", "pgrep -f cyrus-daemon | grep python > /dev/null || $HOME/.local/bin/cyrus-daemon"]
+        command: ["sh", "-c",
+            "P=\"$CYRUS_PROXY_HOST\"; " +
+            "if [ -n \"$P\" ]; then " +
+            "  pgrep -f cyrus-proxy | grep -q python || $HOME/.local/bin/cyrus-proxy --host \"$P\"; " +
+            "else " +
+            "  pgrep -f cyrus-daemon | grep -q python || $HOME/.local/bin/cyrus-daemon; " +
+            "fi"]
         running: true
     }
 
