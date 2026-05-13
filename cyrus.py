@@ -68,6 +68,7 @@ class _State:
 
 _state = _State()
 _session: PromptSession | None = None
+_silent = False
 
 
 def _toolbar() -> str:
@@ -93,19 +94,22 @@ def on_notify(char: BleakGATTCharacteristic, data: bytearray) -> None:
         try:
             vol = raw_to_display(int(payload))
             _state.volume = str(vol)
-            print(f"  volume: {vol}/75")
+            if not _silent:
+                print(f"  volume: {vol}/75")
             _invalidate()
         except ValueError:
             pass
     elif cmd == "M":
         _state.muted = payload == b"11"
-        print("  mute:", "on" if _state.muted else "off")
+        if not _silent:
+            print("  mute:", "on" if _state.muted else "off")
         _invalidate()
     elif cmd == "I":
         if len(payload) >= 2:
             name = INPUT_NAMES.get(payload[1], chr(payload[1]))
             _state.input_name = name
-            print(f"  input: {name}")
+            if not _silent:
+                print(f"  input: {name}")
             _invalidate()
 
 
@@ -180,6 +184,15 @@ async def repl(address: str, adapter: str) -> None:
         async with BleakClient(device, bluez={"adapter": adapter}) as client:
             print(f"Connected to {device.name}. Type 'help' for commands, 'quit' to exit.\n")
             await client.start_notify(DATA_CHAR_UUID, on_notify)
+
+            global _silent
+            _silent = True
+            for letter in b"VMI":
+                await client.write_gatt_char(DATA_CHAR_UUID,
+                                             b"@+F1" + bytes([letter]) + b"%",
+                                             response=True)
+                await asyncio.sleep(0.15)
+            _silent = False
 
             while True:
                 try:
