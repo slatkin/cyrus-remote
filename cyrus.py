@@ -174,15 +174,26 @@ async def find_device(address: str, adapter: str) -> object:
 
 
 async def repl(address: str, adapter: str) -> None:
-    device = await find_device(address, adapter)
+    # Try connecting directly first (works if already paired/connected in BlueZ)
+    client = BleakClient(address, bluez={"adapter": adapter})
+    try:
+        print(f"Connecting to {address}…", file=sys.stderr)
+        await client.connect(timeout=5.0)
+        device_name = address
+    except Exception:
+        # Fall back to scanning
+        device = await find_device(address, adapter)
+        client = BleakClient(device, bluez={"adapter": adapter})
+        await client.connect()
+        device_name = device.name or address
 
     with patch_stdout():
         _state.connected = True
-        _state.device_name = device.name or device.address
+        _state.device_name = device_name
         _invalidate()
 
-        async with BleakClient(device, bluez={"adapter": adapter}) as client:
-            print(f"Connected to {device.name}. Type 'help' for commands, 'quit' to exit.\n")
+        async with client:
+            print(f"Connected to {device_name}. Type 'help' for commands, 'quit' to exit.\n")
             await client.start_notify(DATA_CHAR_UUID, on_notify)
 
             global _silent
