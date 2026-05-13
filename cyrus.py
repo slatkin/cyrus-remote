@@ -25,7 +25,7 @@ DEFAULT_ADAPTER = "hci0"
 SERVICE_UUID    = "bc2f4cc6-aaef-4351-9034-d66268e328f0"
 DATA_CHAR_UUID  = "06d1e5e7-79ad-4a71-8faa-373789f7d93c"
 
-VOL_MIN, VOL_MAX = 0, 75
+VOL_MIN, VOL_MAX = 0, 90
 
 INPUTS = {
     "bt":      b"1",
@@ -58,10 +58,7 @@ def raw_to_display(raw: int) -> int:
 
 
 def display_to_pct(step: int) -> int:
-    if step <= 0:
-        return 0
-    idx = min(step, VOL_MAX)
-    return round(_VOL_BREAKPOINTS[idx] * 100 / _VOL_BREAKPOINTS[VOL_MAX])
+    return round(min(max(step, 0), VOL_MAX) * 100 / VOL_MAX)
 
 
 @dataclass
@@ -100,12 +97,13 @@ def on_notify(char: BleakGATTCharacteristic, data: bytearray) -> None:
     payload = raw[3:-1] if raw[-1] == 0x25 else raw[3:]
     if cmd == "V":
         try:
-            vol = raw_to_display(int(payload))
-            _state.volume = str(vol)
-            if not _silent:
-                print(f"  volume: {vol}/75")
-            _invalidate()
-        except ValueError:
+            vol = int(payload[1:])  # payload = subtype_byte + step, e.g. b"248" → step 48
+            if 0 <= vol <= 90:
+                _state.volume = str(vol)
+                if not _silent:
+                    print(f"  volume: {vol}/75")
+                _invalidate()
+        except (ValueError, IndexError):
             pass
     elif cmd == "M":
         _state.muted = payload == b"11"

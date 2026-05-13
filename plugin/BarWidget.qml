@@ -61,12 +61,20 @@ Rectangle {
             }
         }
         onWheel: function(wheel) {
+            if (volThrottle.running) return
+            volThrottle.start()
             if (wheel.angleDelta.y > 0) {
                 if (!volUpProc.running)   volUpProc.running   = true
             } else {
                 if (!volDownProc.running) volDownProc.running = true
             }
         }
+    }
+
+    Timer {
+        id: volThrottle
+        interval: 300
+        repeat: false
     }
 
     NPopupContextMenu {

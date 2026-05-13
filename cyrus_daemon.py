@@ -15,7 +15,7 @@ DEFAULT_ADAPTER = "hci0"
 SERVICE_UUID    = "bc2f4cc6-aaef-4351-9034-d66268e328f0"
 DATA_CHAR_UUID  = "06d1e5e7-79ad-4a71-8faa-373789f7d93c"
 
-VOL_MIN, VOL_MAX = 0, 75
+VOL_MIN, VOL_MAX = 0, 90
 
 INPUTS = {
     "bt":      b"1",
@@ -53,11 +53,7 @@ def raw_to_display(raw: int) -> int:
 
 
 def display_to_pct(step: int) -> int:
-    """Map display step 0-75 to human-friendly 0-100% via the hardware taper curve."""
-    if step <= 0:
-        return 0
-    idx = min(step, VOL_MAX)
-    return round(_VOL_BREAKPOINTS[idx] * 100 / _VOL_BREAKPOINTS[VOL_MAX])
+    return round(min(max(step, 0), VOL_MAX) * 100 / VOL_MAX)
 
 
 @dataclass
@@ -100,11 +96,11 @@ def on_notify(char: BleakGATTCharacteristic, data: bytearray) -> None:
     changed = False
     if cmd == "V":
         try:
-            vol = raw_to_display(int(payload))
-            if _state.volume != vol:
+            vol = int(payload[1:])  # payload = subtype_byte + step, e.g. b"248" → step 48
+            if 0 <= vol <= 90 and _state.volume != vol:
                 _state.volume = vol
                 changed = True
-        except ValueError:
+        except (ValueError, IndexError):
             pass
     elif cmd == "M":
         muted = payload == b"11"
@@ -159,9 +155,13 @@ async def handle_command(cmd: str) -> None:
             data = b"@+I1" + INPUTS[src] + b"%"
 
     if data:
+        is_vol_cmd = cmd in ("vol+", "vol-") or cmd.startswith("vol:")
         try:
             await client.write_gatt_char(DATA_CHAR_UUID, data, response=True)
             await push_state()
+            if is_vol_cmd:
+                await asyncio.sleep(0.15)
+                await client.write_gatt_char(DATA_CHAR_UUID, b"@+F1V%", response=True)
         except Exception as e:
             print(f"command error: {e}", file=sys.stderr)
 
@@ -249,14 +249,33 @@ async def ble_loop(address: str, adapter: str) -> None:
 async def main(address: str, adapter: str) -> None:
     global _loop
     _loop = asyncio.get_running_loop()
-    await asyncio.gather(
-        ble_loop(address, adapter),
-        serve_socket(),
-    )
+
+    loop = asyncio.get_running_loop()
+    task = asyncio.current_task()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, lambda: task.cancel())
+
+    try:
+        await asyncio.gather(
+            ble_loop(address, adapter),
+            serve_socket(),
+        )
+    except asyncio.CancelledError:
+        pass
+    finally:
+        if _client and _client.is_connected:
+            try:
+                await _client.disconnect()
+            except Exception:
+                pass
+        if os.path.exists(SOCK_PATH):
+            os.unlink(SOCK_PATH)
+        print("\nDaemon stopped.", file=sys.stderr)
 
 
 if __name__ == "__main__":
     import argparse
+    import signal
     parser = argparse.ArgumentParser(description="Cyrus ONE BLE daemon")
     parser.add_argument("-a", "--address", default=DEFAULT_ADDRESS,
                         help=f"BT address (default: {DEFAULT_ADDRESS})")
@@ -266,7 +285,5 @@ if __name__ == "__main__":
 
     try:
         asyncio.run(main(args.address, args.adapter))
-    except KeyboardInterrupt:
-        if os.path.exists(SOCK_PATH):
-            os.unlink(SOCK_PATH)
-        print("\nDaemon stopped.")
+    except (KeyboardInterrupt, SystemExit):
+        pass
