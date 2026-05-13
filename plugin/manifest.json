@@ -1,0 +1,16 @@
+{
+  "id": "cyrus-remote",
+  "name": "Cyrus Remote",
+  "version": "1.0.0",
+  "minNoctaliaVersion": "3.6.0",
+  "author": "slatkin",
+  "license": "MIT",
+  "description": "Cyrus ONE BLE amp status in the bar",
+  "entryPoints": {
+    "main": "Main.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "metadata": {
+    "defaultSettings": {}
+  }
+}
