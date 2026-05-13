@@ -16,9 +16,9 @@ from dataclasses import dataclass
 from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from prompt_toolkit import PromptSession
-from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.patch_stdout import patch_stdout
+from prompt_toolkit.styles import Style
 
 DEFAULT_ADDRESS = "FD:6D:51:B8:5F:7E"
 DEFAULT_ADAPTER = "hci0"
@@ -70,17 +70,12 @@ _state = _State()
 _session: PromptSession | None = None
 
 
-def _toolbar() -> HTML:
+def _toolbar() -> str:
     s = _state
     if not s.connected:
-        return HTML(" ○ Not connected")
-    mute = "  <b>MUTED</b>" if s.muted else ""
-    return HTML(
-        f" ● <b>{s.device_name}</b>"
-        f"  │  Vol: <b>{s.volume}/75</b>"
-        f"  │  Input: <b>{s.input_name}</b>"
-        f"{mute}"
-    )
+        return " not connected"
+    mute = "  |  muted" if s.muted else ""
+    return f" vol: {s.volume}/75  |  input: {s.input_name}{mute}"
 
 
 def _invalidate() -> None:
@@ -113,7 +108,10 @@ def on_notify(char: BleakGATTCharacteristic, data: bytearray) -> None:
             print(f"  input: {name}")
             _invalidate()
     elif cmd == "A":
-        print("  av-direct:", "on" if payload == b"11" else "off")
+        if payload == b"10":
+            print("  av-direct: off")
+        elif payload == b"11":
+            print("  av-direct: on")
 
 
 def parse_cmd(line: str) -> bytes | None:
@@ -260,6 +258,7 @@ if __name__ == "__main__":
     _session = PromptSession(
         history=FileHistory(_history_path()),
         bottom_toolbar=_toolbar,
+        style=Style.from_dict({"bottom-toolbar": "reverse"}),
     )
 
     try:
