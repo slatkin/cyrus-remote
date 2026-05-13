@@ -40,7 +40,7 @@ Each client machine runs `cyrus-proxy`, which:
 
 ### Requirements (server)
 
-- Debian/Ubuntu with BlueZ
+- Linux with BlueZ
 - Python 3.10+
 - `bleak`: `pip install bleak`
 
