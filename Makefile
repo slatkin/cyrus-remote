@@ -4,6 +4,7 @@ PLUGINDIR := $(HOME)/.config/noctalia/plugins/cyrus-remote
 .PHONY: install uninstall
 
 install:
+	mkdir -p $(BINDIR)
 	install -m 755 cyrus.py        $(BINDIR)/cyrus-remote
 	install -m 755 cyrus_daemon.py $(BINDIR)/cyrus-daemon
 	install -m 755 cyrus_cmd.py    $(BINDIR)/cyrus-cmd
