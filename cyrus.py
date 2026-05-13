@@ -74,8 +74,8 @@ def _toolbar() -> str:
     s = _state
     if not s.connected:
         return " not connected"
-    mute = "  |  muted" if s.muted else ""
-    return f" vol: {s.volume}/75  |  input: {s.input_name}{mute}"
+    mute = "on" if s.muted else "off"
+    return f" vol: {s.volume}/75  |  input: {s.input_name}  |  mute: {mute}"
 
 
 def _invalidate() -> None:
@@ -107,11 +107,6 @@ def on_notify(char: BleakGATTCharacteristic, data: bytearray) -> None:
             _state.input_name = name
             print(f"  input: {name}")
             _invalidate()
-    elif cmd == "A":
-        if payload == b"10":
-            print("  av-direct: off")
-        elif payload == b"11":
-            print("  av-direct: on")
 
 
 def parse_cmd(line: str) -> bytes | None:
@@ -185,12 +180,6 @@ async def repl(address: str, adapter: str) -> None:
         async with BleakClient(device, bluez={"adapter": adapter}) as client:
             print(f"Connected to {device.name}. Type 'help' for commands, 'quit' to exit.\n")
             await client.start_notify(DATA_CHAR_UUID, on_notify)
-
-            for letter in b"VMIA":
-                await client.write_gatt_char(DATA_CHAR_UUID,
-                                             b"@+F1" + bytes([letter]) + b"%",
-                                             response=True)
-                await asyncio.sleep(0.15)
 
             while True:
                 try:
