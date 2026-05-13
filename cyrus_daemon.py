@@ -165,32 +165,22 @@ async def serve_socket() -> None:
 
 async def connect_and_run(address: str, adapter: str) -> None:
     global _client
+    print(f"Scanning for {address} on {adapter}…", file=sys.stderr)
+    device = await BleakScanner.find_device_by_filter(
+        lambda d, adv: (
+            d.address.upper() == address.upper()
+            or SERVICE_UUID.lower() in [str(u).lower() for u in adv.service_uuids]
+            or "cyrus" in (d.name or "").lower()
+            or (d.name or "").upper().startswith("ONE-")
+        ),
+        timeout=30.0,
+        bluez={"adapter": adapter},
+    )
+    if device is None:
+        raise RuntimeError("Device not found within 30s")
 
-    # Try direct connection first (works if already paired/connected in BlueZ)
-    client = BleakClient(address, bluez={"adapter": adapter})
-    try:
-        print(f"Connecting to {address}…", file=sys.stderr)
-        await client.connect(timeout=5.0)
-    except Exception:
-        # Fall back to scanning
-        print(f"Scanning for {address} on {adapter}…", file=sys.stderr)
-        device = await BleakScanner.find_device_by_filter(
-            lambda d, adv: (
-                d.address.upper() == address.upper()
-                or SERVICE_UUID.lower() in [str(u).lower() for u in adv.service_uuids]
-                or "cyrus" in (d.name or "").lower()
-                or (d.name or "").upper().startswith("ONE-")
-            ),
-            timeout=30.0,
-            bluez={"adapter": adapter},
-        )
-        if device is None:
-            raise RuntimeError("Device not found within 30s")
-        client = BleakClient(device, bluez={"adapter": adapter})
-        await client.connect()
-
-    print(f"Connected to {address}", file=sys.stderr)
-    async with client:
+    print(f"Connected to {device.name}", file=sys.stderr)
+    async with BleakClient(device, bluez={"adapter": adapter}) as client:
         _client = client
         _state.connected = True
 
