@@ -14,8 +14,8 @@ install:
 	install -m 644 plugin/Main.qml      $(PLUGINDIR)/
 	install -m 644 plugin/BarWidget.qml $(PLUGINDIR)/
 	@echo ""
-	@echo "Add to ~/.config/noctalia/plugins.json:"
-	@echo '  { "id": "cyrus-remote", "enabled": true, "path": "$(PLUGINDIR)" }'
+	@echo "Add to the 'states' object in ~/.config/noctalia/plugins.json:"
+	@echo '  "cyrus-remote": { "enabled": true }'
 	@echo ""
 	@echo "Run the daemon: cyrus-daemon &"
 
