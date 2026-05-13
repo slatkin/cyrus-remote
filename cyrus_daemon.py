@@ -133,13 +133,15 @@ async def handle_command(cmd: str) -> None:
             print(f"command error: {e}", file=sys.stderr)
         return
     elif cmd == "vol+":
-        data = b"@+V2" + f"{min(VOL_MAX, _state.volume + 1):02d}".encode() + b"%"
+        _state.volume = min(VOL_MAX, _state.volume + 1)
+        data = b"@+V2" + f"{_state.volume:02d}".encode() + b"%"
     elif cmd == "vol-":
-        data = b"@+V2" + f"{max(VOL_MIN, _state.volume - 1):02d}".encode() + b"%"
+        _state.volume = max(VOL_MIN, _state.volume - 1)
+        data = b"@+V2" + f"{_state.volume:02d}".encode() + b"%"
     elif cmd.startswith("vol:"):
         try:
-            level = max(VOL_MIN, min(VOL_MAX, int(cmd[4:])))
-            data = b"@+V2" + f"{level:02d}".encode() + b"%"
+            _state.volume = max(VOL_MIN, min(VOL_MAX, int(cmd[4:])))
+            data = b"@+V2" + f"{_state.volume:02d}".encode() + b"%"
         except ValueError:
             pass
     elif cmd.startswith("input:"):
@@ -150,6 +152,7 @@ async def handle_command(cmd: str) -> None:
     if data:
         try:
             await client.write_gatt_char(DATA_CHAR_UUID, data, response=True)
+            await push_state()
         except Exception as e:
             print(f"command error: {e}", file=sys.stderr)
 
