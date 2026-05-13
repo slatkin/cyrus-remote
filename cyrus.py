@@ -4,7 +4,7 @@
 Protocol (all writes to DATA_CHAR_UUID, with-response):
     Mute on:  @+M11%      Mute off: @+M10%
     Input N:  @+I1N%      (N = 1..8)
-    Volume:   @+V2<DD>%   (DD = display step 00..75, zero-padded)
+    Volume:   @+V2<DD>%   (DD = display step 00..90, zero-padded)
     Fetch:    @+F1<C>%    (C = V/M/I/A to request current state)
 """
 
@@ -101,7 +101,7 @@ def on_notify(char: BleakGATTCharacteristic, data: bytearray) -> None:
             if 0 <= vol <= 90:
                 _state.volume = str(vol)
                 if not _silent:
-                    print(f"  volume: {vol}/75")
+                    print(f"  volume: {vol}/{VOL_MAX}")
                 _invalidate()
         except (ValueError, IndexError):
             pass
@@ -133,12 +133,12 @@ def parse_cmd(line: str) -> bytes | None:
         return b""
     if cmd in ("volume", "vol", "v"):
         if len(parts) < 2:
-            print("  usage: volume <0-75>")
+            print("  usage: volume <0-90>")
             return None
         try:
             level = int(parts[1])
         except ValueError:
-            print("  volume must be a number 0-75")
+            print("  volume must be a number 0-90")
             return None
         level = max(VOL_MIN, min(VOL_MAX, level))
         return b"@+V2" + f"{level:02d}".encode() + b"%"
@@ -152,7 +152,7 @@ def parse_cmd(line: str) -> bytes | None:
             return None
         return b"@+I1" + INPUTS[src] + b"%"
     if cmd in ("help", "?", "h"):
-        print("  commands: mute  unmute  volume <0-75>  input <"
+        print("  commands: mute  unmute  volume <0-90>  input <"
               + "|".join(INPUTS) + ">  status  quit")
         return None
     if cmd in ("quit", "q", "exit"):
