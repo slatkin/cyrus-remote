@@ -206,7 +206,7 @@ async def connect_and_run(address: str, adapter: str) -> None:
 
         async def _periodic_sync() -> None:
             while client.is_connected:
-                await asyncio.sleep(30)
+                await asyncio.sleep(10)
                 if client.is_connected:
                     try:
                         for letter in b"VMI":
