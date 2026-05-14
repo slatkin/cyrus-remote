@@ -70,6 +70,8 @@ _client: BleakClient | None = None
 _loop: asyncio.AbstractEventLoop | None = None
 _tcp_writers: set[asyncio.StreamWriter] = set()
 _no_ipc: bool = False
+_mqtt_client: "aiomqtt.Client | None" = None
+_mqtt_topic: str = "cyrus"
 
 
 def _state_payload() -> str:
@@ -79,6 +81,7 @@ def _state_payload() -> str:
         "vol_pct": display_to_pct(_state.volume),
         "muted": _state.muted,
         "input": _state.input_name,
+        "state": "on" if _state.connected else "off",
     })
 
 
@@ -100,6 +103,11 @@ async def push_state() -> None:
         except Exception:
             dead.add(writer)
     _tcp_writers.difference_update(dead)
+    if _mqtt_client is not None:
+        try:
+            await _mqtt_client.publish(f"{_mqtt_topic}/state", payload, retain=True)
+        except Exception:
+            pass
 
 
 def on_notify(char: BleakGATTCharacteristic, data: bytearray) -> None:
@@ -282,7 +290,58 @@ async def ble_loop(address: str, adapter: str) -> None:
         await asyncio.sleep(3)
 
 
-async def main(address: str, adapter: str, tcp_port: int, no_ipc: bool) -> None:
+async def mqtt_loop(host: str, port: int, user: str | None, password: str | None, topic: str) -> None:
+    global _mqtt_client, _mqtt_topic
+    _mqtt_topic = topic
+    import aiomqtt
+
+    discovery = json.dumps({
+        "name": "Cyrus ONE",
+        "unique_id": "cyrus_one_amp",
+        "state_topic": f"{topic}/state",
+        "value_template": "{{ value_json.state }}",
+        "availability_topic": f"{topic}/state",
+        "availability_template": "{{ 'online' if value_json.connected else 'offline' }}",
+        "volume_statopic": f"{topic}/state",
+        "volume_template": "{{ value_json.vol_pct | float / 100 }}",
+        "set_volume_topic": f"{topic}/command",
+        "set_volume_template": "vol:{{ (volume * 90) | int }}",
+        "mute_state_topic": f"{topic}/state",
+        "mute_value_template": "{{ value_json.muted | lower }}",
+        "mute_command_topic": f"{topic}/command",
+        "mute_command_template": "{{ 'mute' if is_volume_muted else 'unmute' }}",
+        "source_state_topic": f"{topic}/state",
+        "source_value_template": "{{ value_json.input }}",
+        "source_list": list(INPUTS.keys()),
+        "select_source_topic": f"{topic}/command",
+        "select_source_template": "input:{{ source }}",
+    })
+
+    while True:
+        try:
+            async with aiomqtt.Client(
+                hostname=host, port=port,
+                username=user, password=password,
+            ) as client:
+                _mqtt_client = client
+                await client.publish(f"homeassistant/media_player/cyrus_one/config",
+                                     discovery, retain=True)
+                await client.publish(f"{topic}/state", _state_payload(), retain=True)
+                await client.subscribe(f"{topic}/command")
+                print(f"MQTT connected to {host}:{port}", file=sys.stderr)
+                async for message in client.messages:
+                    await handle_command(message.payload.decode())
+        except Exception as e:
+            print(f"MQTT disconnected: {e}. Reconnecting in 5s…", file=sys.stderr)
+        finally:
+            _mqtt_client = None
+        await asyncio.sleep(5)
+
+
+async def main(address: str, adapter: str, tcp_port: int, no_ipc: bool,
+               mqtt_host: str | None, mqtt_port: int,
+               mqtt_user: str | None, mqtt_password: str | None,
+               mqtt_topic: str) -> None:
     global _loop, _no_ipc
     _loop = asyncio.get_running_loop()
     _no_ipc = no_ipc
@@ -297,6 +356,10 @@ async def main(address: str, adapter: str, tcp_port: int, no_ipc: bool) -> None:
         asyncio.ensure_future(serve_socket()),
         asyncio.ensure_future(serve_tcp(tcp_port)),
     ]
+    if mqtt_host:
+        tasks.append(asyncio.ensure_future(
+            mqtt_loop(mqtt_host, mqtt_port, mqtt_user, mqtt_password, mqtt_topic)
+        ))
 
     await shutdown.wait()
 
@@ -327,9 +390,19 @@ if __name__ == "__main__":
                         help=f"TCP port for remote commands (default: {TCP_PORT})")
     parser.add_argument("--no-ipc", action="store_true",
                         help="Skip local Noctalia IPC push (headless/server mode)")
+    parser.add_argument("--mqtt-host", default=None,
+                        help="MQTT broker hostname (enables MQTT publishing)")
+    parser.add_argument("--mqtt-port", type=int, default=1883,
+                        help="MQTT broker port (default: 1883)")
+    parser.add_argument("--mqtt-user", default=None, help="MQTT username")
+    parser.add_argument("--mqtt-password", default=None, help="MQTT password")
+    parser.add_argument("--mqtt-topic", default="cyrus",
+                        help="MQTT topic prefix (default: cyrus)")
     args = parser.parse_args()
 
     try:
-        asyncio.run(main(args.address, args.adapter, args.port, args.no_ipc))
+        asyncio.run(main(args.address, args.adapter, args.port, args.no_ipc,
+                         args.mqtt_host, args.mqtt_port,
+                         args.mqtt_user, args.mqtt_password, args.mqtt_topic))
     except (KeyboardInterrupt, SystemExit):
         pass
