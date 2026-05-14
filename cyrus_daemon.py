@@ -409,7 +409,10 @@ async def main(address: str, adapter: str, tcp_port: int, no_ipc: bool,
 
     for t in tasks:
         t.cancel()
-    await asyncio.gather(*tasks, return_exceptions=True)
+    try:
+        await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=5.0)
+    except asyncio.TimeoutError:
+        pass
 
     if os.path.exists(SOCK_PATH):
         os.unlink(SOCK_PATH)

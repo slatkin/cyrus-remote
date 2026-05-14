@@ -4,9 +4,10 @@ After=bluetooth.target
 Requires=bluetooth.target
 
 [Service]
-ExecStart=/usr/local/bin/cyrus-daemon --no-ipc --mqtt-host home.local
+ExecStart=/usr/local/bin/cyrus-daemon --no-ipc --mqtt-host home.local --mqtt-user tas-user --mqtt-password tas-password
 Restart=on-failure
 RestartSec=5
+TimeoutStopSec=8
 RuntimeDirectory=cyrus-remote
 Environment=XDG_RUNTIME_DIR=/run/cyrus-remote
 
