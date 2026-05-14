@@ -4,7 +4,7 @@ After=bluetooth.target
 Requires=bluetooth.target
 
 [Service]
-ExecStart=/usr/local/bin/cyrus-daemon --no-ipc --mqtt-host homeassistant.local
+ExecStart=/usr/local/bin/cyrus-daemon --no-ipc --mqtt-host home.local
 Restart=on-failure
 RestartSec=5
 RuntimeDirectory=cyrus-remote
