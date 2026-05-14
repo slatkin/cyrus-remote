@@ -302,7 +302,7 @@ async def mqtt_loop(host: str, port: int, user: str | None, password: str | None
         "value_template": "{{ value_json.state }}",
         "availability_topic": f"{topic}/state",
         "availability_template": "{{ 'online' if value_json.connected else 'offline' }}",
-        "volume_statopic": f"{topic}/state",
+        "volume_state_topic": f"{topic}/state",
         "volume_template": "{{ value_json.vol_pct | float / 100 }}",
         "set_volume_topic": f"{topic}/command",
         "set_volume_template": "vol:{{ (volume * 90) | int }}",
