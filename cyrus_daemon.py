@@ -295,27 +295,64 @@ async def mqtt_loop(host: str, port: int, user: str | None, password: str | None
     _mqtt_topic = topic
     import aiomqtt
 
-    discovery = json.dumps({
+    device = {
+        "identifiers": ["cyrus_one_amp"],
         "name": "Cyrus ONE",
-        "unique_id": "cyrus_one_amp",
-        "state_topic": f"{topic}/state",
-        "value_template": "{{ value_json.state }}",
-        "availability_topic": f"{topic}/state",
-        "availability_template": "{{ 'online' if value_json.connected else 'offline' }}",
-        "volume_state_topic": f"{topic}/state",
-        "volume_template": "{{ value_json.vol_pct | float / 100 }}",
-        "set_volume_topic": f"{topic}/command",
-        "set_volume_template": "vol:{{ (volume * 90) | int }}",
-        "mute_state_topic": f"{topic}/state",
-        "mute_value_template": "{{ value_json.muted | lower }}",
-        "mute_command_topic": f"{topic}/command",
-        "mute_command_template": "{{ 'mute' if is_volume_muted else 'unmute' }}",
-        "source_state_topic": f"{topic}/state",
-        "source_value_template": "{{ value_json.input }}",
-        "source_list": list(INPUTS.keys()),
-        "select_source_topic": f"{topic}/command",
-        "select_source_template": "input:{{ source }}",
-    })
+        "model": "ONE",
+        "manufacturer": "Cyrus",
+    }
+    availability = [{
+        "topic": f"{topic}/state",
+        "value_template": "{{ 'online' if value_json.connected else 'offline' }}",
+    }]
+    discoveries = {
+        "homeassistant/binary_sensor/cyrus_connected/config": {
+            "name": "Connected",
+            "unique_id": "cyrus_one_connected",
+            "state_topic": f"{topic}/state",
+            "value_template": "{{ 'ON' if value_json.connected else 'OFF' }}",
+            "device_class": "connectivity",
+            "device": device,
+            "availability": availability,
+        },
+        "homeassistant/number/cyrus_volume/config": {
+            "name": "Volume",
+            "unique_id": "cyrus_one_volume",
+            "state_topic": f"{topic}/state",
+            "value_template": "{{ value_json.vol }}",
+            "command_topic": f"{topic}/command",
+            "command_template": "vol:{{ value | int }}",
+            "min": 0,
+            "max": 90,
+            "step": 1,
+            "device": device,
+            "availability": availability,
+        },
+        "homeassistant/switch/cyrus_mute/config": {
+            "name": "Mute",
+            "unique_id": "cyrus_one_mute",
+            "state_topic": f"{topic}/state",
+            "value_template": "{{ 'ON' if value_json.muted else 'OFF' }}",
+            "state_on": "ON",
+            "state_off": "OFF",
+            "command_topic": f"{topic}/command",
+            "payload_on": "mute",
+            "payload_off": "unmute",
+            "device": device,
+            "availability": availability,
+        },
+        "homeassistant/select/cyrus_input/config": {
+            "name": "Input",
+            "unique_id": "cyrus_one_input",
+            "state_topic": f"{topic}/state",
+            "value_template": "{{ value_json.input }}",
+            "command_topic": f"{topic}/command",
+            "command_template": "input:{{ value }}",
+            "options": list(INPUTS.keys()),
+            "device": device,
+            "availability": availability,
+        },
+    }
 
     while True:
         try:
@@ -324,8 +361,9 @@ async def mqtt_loop(host: str, port: int, user: str | None, password: str | None
                 username=user, password=password,
             ) as client:
                 _mqtt_client = client
-                await client.publish(f"homeassistant/media_player/cyrus_one/config",
-                                     discovery, retain=True)
+                await client.publish("homeassistant/media_player/cyrus_one/config", "", retain=True)
+                for disc_topic, payload in discoveries.items():
+                    await client.publish(disc_topic, json.dumps(payload), retain=True)
                 await client.publish(f"{topic}/state", _state_payload(), retain=True)
                 await client.subscribe(f"{topic}/command")
                 print(f"MQTT connected to {host}:{port}", file=sys.stderr)
