@@ -15,8 +15,8 @@ DEFAULT_PORT = 9876
 
 async def ipc_push(payload: str) -> None:
     proc = await asyncio.create_subprocess_exec(
-        "qs", "-c", "noctalia-shell", "ipc", "call",
-        "plugin:cyrus-remote", "updateState", payload,
+        "noctalia", "msg", "scripted-widget", "cyrus",
+        "all", "updateState", payload,
         stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.DEVNULL,
     )

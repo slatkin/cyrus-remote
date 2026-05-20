@@ -89,8 +89,8 @@ async def push_state() -> None:
     payload = _state_payload()
     if not _no_ipc:
         proc = await asyncio.create_subprocess_exec(
-            "qs", "-c", "noctalia-shell", "ipc", "call",
-            "plugin:cyrus-remote", "updateState", payload,
+            "noctalia", "msg", "scripted-widget", "cyrus",
+            "all", "updateState", payload,
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
         )

@@ -1,22 +1,24 @@
 BINDIR    := $(HOME)/.local/bin
-PLUGINDIR := $(HOME)/.config/noctalia/plugins/cyrus-remote
+SCRIPTDIR  := $(HOME)/.config/noctalia/scripts
+BARCONFIG  := $(HOME)/.local/state/noctalia/settings.toml
 
 .PHONY: install uninstall install-service
 
 install:
-	mkdir -p $(BINDIR)
+	mkdir -p $(BINDIR) $(SCRIPTDIR)
 	install -m 755 cyrus.py        $(BINDIR)/cyrus-remote
 	install -m 755 cyrus_daemon.py $(BINDIR)/cyrus-daemon
 	install -m 755 cyrus_cmd.py    $(BINDIR)/cyrus-cmd
 	install -m 755 cyrus_proxy.py  $(BINDIR)/cyrus-proxy
 	ln -sf $(BINDIR)/cyrus-remote $(BINDIR)/cr
-	mkdir -p $(PLUGINDIR)
-	install -m 644 plugin/manifest.json $(PLUGINDIR)/
-	install -m 644 plugin/Main.qml      $(PLUGINDIR)/
-	install -m 644 plugin/BarWidget.qml $(PLUGINDIR)/
+	install -m 644 widget/cyrus.lua $(SCRIPTDIR)/
 	@echo ""
-	@echo "Add to the 'states' object in ~/.config/noctalia/plugins.json:"
-	@echo '  "cyrus-remote": { "enabled": true }'
+	@echo "Bar config: $(BARCONFIG)"
+	@echo "Add to start/end list: \"cyrus\""
+	@echo ""
+	@echo "  [widget.cyrus]"
+	@echo "  type   = \"scripted\""
+	@echo "  script = \"~/.config/noctalia/scripts/cyrus.lua\""
 	@echo ""
 	@echo "Run the daemon: cyrus-daemon &"
 
@@ -29,4 +31,4 @@ install-service:
 
 uninstall:
 	rm -f $(BINDIR)/cyrus-remote $(BINDIR)/cyrus-daemon $(BINDIR)/cyrus-cmd $(BINDIR)/cyrus-proxy $(BINDIR)/cr
-	rm -rf $(PLUGINDIR)
+	rm -f $(SCRIPTDIR)/cyrus.lua
