@@ -11,14 +11,19 @@ install:
 	install -m 755 cyrus_cmd.py    $(BINDIR)/cyrus-cmd
 	install -m 755 cyrus_proxy.py  $(BINDIR)/cyrus-proxy
 	ln -sf $(BINDIR)/cyrus-remote $(BINDIR)/cr
-	install -m 644 widget/cyrus.lua $(SCRIPTDIR)/
+	install -m 644 widget/cyrus_volume.lua $(SCRIPTDIR)/
+	install -m 644 widget/cyrus_input.lua  $(SCRIPTDIR)/
 	@echo ""
 	@echo "Bar config: $(BARCONFIG)"
 	@echo "Add to start/end list: \"cyrus\""
 	@echo ""
-	@echo "  [widget.cyrus]"
+	@echo "  [widget.cyrus-volume]"
 	@echo "  type   = \"scripted\""
-	@echo "  script = \"~/.config/noctalia/scripts/cyrus.lua\""
+	@echo "  script = \"~/.config/noctalia/scripts/cyrus_volume.lua\""
+	@echo ""
+	@echo "  [widget.cyrus-input]"
+	@echo "  type   = \"scripted\""
+	@echo "  script = \"~/.config/noctalia/scripts/cyrus_input.lua\""
 	@echo ""
 	@echo "Run the daemon: cyrus-daemon &"
 
@@ -31,4 +36,4 @@ install-service:
 
 uninstall:
 	rm -f $(BINDIR)/cyrus-remote $(BINDIR)/cyrus-daemon $(BINDIR)/cyrus-cmd $(BINDIR)/cyrus-proxy $(BINDIR)/cr
-	rm -f $(SCRIPTDIR)/cyrus.lua
+	rm -f $(SCRIPTDIR)/cyrus.lua $(SCRIPTDIR)/cyrus_volume.lua $(SCRIPTDIR)/cyrus_input.lua

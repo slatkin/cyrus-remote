@@ -13,14 +13,21 @@ SOCK_PATH = os.path.join(
 DEFAULT_PORT = 9876
 
 
-async def ipc_push(payload: str) -> None:
+async def _ipc_push(widget: str, payload: str) -> None:
     proc = await asyncio.create_subprocess_exec(
-        "noctalia", "msg", "scripted-widget", "cyrus",
+        "noctalia", "msg", "scripted-widget", widget,
         "all", "updateState", payload,
         stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.DEVNULL,
     )
     await proc.wait()
+
+
+async def ipc_push(payload: str) -> None:
+    await asyncio.gather(
+        _ipc_push("cyrus-volume", payload),
+        _ipc_push("cyrus-input", payload),
+    )
 
 
 async def _local_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter,
