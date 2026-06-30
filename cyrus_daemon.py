@@ -85,9 +85,9 @@ def _state_payload() -> str:
     })
 
 
-async def _ipc_push(widget: str, payload: str) -> None:
+async def _ipc_push(entry: str, payload: str) -> None:
     proc = await asyncio.create_subprocess_exec(
-        "noctalia", "msg", "scripted-widget", widget,
+        "noctalia", "msg", "plugin", f"slatkin/cyrus:{entry}",
         "all", "updateState", payload,
         stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.DEVNULL,
@@ -99,8 +99,8 @@ async def push_state() -> None:
     payload = _state_payload()
     if not _no_ipc:
         await asyncio.gather(
-            _ipc_push("cyrus-volume", payload),
-            _ipc_push("cyrus-input", payload),
+            _ipc_push("volume", payload),
+            _ipc_push("input", payload),
         )
     dead = set()
     for writer in list(_tcp_writers):

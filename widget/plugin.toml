@@ -1,0 +1,15 @@
+id           = "slatkin/cyrus"
+name         = "Cyrus Remote"
+version      = "1.0.0"
+min_noctalia = "5.0.0"
+author       = "slatkin"
+icon         = "music"
+description  = "Cyrus ONE amplifier remote control widgets"
+
+[[widget]]
+id    = "volume"
+entry = "cyrus_volume.luau"
+
+[[widget]]
+id    = "input"
+entry = "cyrus_input.luau"

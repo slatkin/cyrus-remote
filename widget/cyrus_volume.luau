@@ -49,7 +49,7 @@ function update()
             "nohup " .. home .. "/.local/bin/cyrus-daemon > /dev/null 2>&1 &"
         )
     end
-    barWidget.setUpdateInterval(5000)
+    noctalia.setUpdateInterval(5000)
     updateDisplay()
 end
 
